@@ -7,7 +7,14 @@ const multer = require("multer"); // for upload file
 const app = express();
 var fs = require("fs");
 var path = require("path");
-app.use(bodyParser.json());
+app.use(
+  bodyParser.urlencoded({
+    limit: "50mb",
+    extended: true,
+    parameterLimit: 50000,
+  })
+);
+
 app.use(cors());
 
 // connect to serveur
@@ -21,60 +28,46 @@ const contactSchema = new mongoose.Schema({
   email: String,
   phone: Number,
   gender: String,
-  img: 
-    { 
-        data: Buffer, 
-        contentType: String 
-    } 
+  img: {
+    data: Buffer,
+    contentType: String,
+  },
 });
 
 const Contact = mongoose.model("contact", contactSchema);
-var i = 1 ;
+
 const storage = multer.diskStorage({
   destination: (req, file, callBack) => {
     callBack(null, "uploads");
   },
   filename: (req, file, callBack) => {
-    callBack(null, `${i}_${file.originalname}`);
+    callBack(null, `${file.originalname}`);
   },
 });
-
-var  upload = multer({ storage: storage })
-app.post("/images",upload.single("file"),(req,res)=>{
-
-})
-
-app.post("/add", (req, res) => {
-  let picture = req.body.profilePicName
- const pic = `${i}_${picture}`
- i+= 1
-   const contact =new Contact( {
+var upload = multer({ storage: storage });
+app.post("/add", upload.single("file"), (req, res) => {
+  let picture = req.file.filename;
+  const pic = `${picture}`;
+  const contact = new Contact({
     firstname: req.body.firstName,
     lastname: req.body.lastName,
     email: req.body.email,
-    phone:req.body.phone,
+    phone: req.body.phone,
     gender: req.body.gender,
-    img: { 
-      data: fs.readFileSync(path.join(__dirname + '/uploads/' + pic)), 
-      contentType: 'image'
-  } 
-  }) 
-  Contact.insertMany([contact], (err) => {
-    if (err) {
-      console.log(err);
-    } else {
-      console.log("done......");
-    }
+    img: {
+      data: fs.readFileSync(path.join(__dirname + "/uploads/" + pic)),
+      contentType: "image",
+    },
   });
-  
-
+  contact.save();
+  fs.unlinkSync(path.join(__dirname + "/uploads/" + pic));
 });
 app.get("/list", (req, res) => {
   Contact.find({}, (err, list) => {
     if (err) {
-      res.send(err);
+      res.json(err);
     } else {
-      res.send(list);
+      res.json(list);
     }
   });
 });
@@ -89,11 +82,12 @@ app.get("/contact/:id", (req, res) => {
   });
 });
 
-app.put("/contact/:id", (req, res) => {
+app.put("/contact/:id", upload.single("file"), (req, res) => {
+  console.log(req.file);
   let contactId = req.params.id;
-  let picture = req.body.profilePicName
- const updatePic = `${i}_${picture}`
- i+= 1
+  let picture = req.file.filename;
+
+  const updatePic = `${picture}`;
   Contact.updateOne(
     { _id: contactId },
     {
@@ -101,11 +95,11 @@ app.put("/contact/:id", (req, res) => {
       lastname: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
-      gender: req.body.gender ,
-      img: { 
-        data: fs.readFileSync(path.join(__dirname + '/uploads/' + updatePic)), 
-        contentType: 'image'
-    } 
+      gender: req.body.gender,
+      img: {
+        data: fs.readFileSync(path.join(__dirname + "/uploads/" + updatePic)),
+        contentType: "image",
+      },
     },
     (err) => {
       if (err) {
@@ -115,8 +109,8 @@ app.put("/contact/:id", (req, res) => {
       }
     }
   );
+  fs.unlinkSync(path.join(__dirname + "/uploads/" + updatePic));
 });
-
 
 app.listen(3000, () => {
   console.log("server work");
